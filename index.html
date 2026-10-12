@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Board — Type-Safe Collaborative Tracker</title>
+  <script type="module" src="./model.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Smooth animations and keyframes */
+    .task-card-enter {
+      animation: cardSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes cardSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .slide-exit {
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0;
+      transform: scale(0.94) translateX(24px);
+    }
+    
+    /* Slide-over sheet transition */
+    .slide-panel {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .slide-panel-open {
+      transform: translateX(0%);
+    }
+    .slide-panel-closed {
+      transform: translateX(100%);
+    }
+
+    /* Deck presentation slide animations */
+    .deck-slide {
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .deck-slide.hidden-slide {
+      display: none;
+      opacity: 0;
+      transform: translateX(30px);
+    }
+
+    /* Live collaborator presence pulse */
+    .user-pulse {
+      position: relative;
+    }
+    .user-pulse::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 9px;
+      height: 9px;
+      border-radius: 9999px;
+      background: #10b981;
+      border: 2px solid #0f172a;
+    }
+
+    /* Custom thin scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.45);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white flex flex-col relative overflow-x-hidden">
+
+  <!-- Main Top Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-xl sticky top-0 z-30 px-4 lg:px-8 py-3.5 transition-colors">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo & Board Identification -->
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center">
+          <div class="h-full w-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <span class="text-indigo-400 font-mono font-bold text-base">&lt;T&gt;</span>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-lg text-white tracking-tight">Task Board</h1>
+            <span class="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">Strict TS v5.4</span>
+            <span class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Multi-User Sync
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Collaborative Workspace &middot; Type-Safe State Architecture</p>
+        </div>
+      </div>
+
+      <!-- Right Header Actions: User Persona Switcher & Tools -->
+      <div class="flex items-center flex-wrap gap-2.5">
+        
+        <!-- Active User Simulator Selector -->
+        <div class="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-inner">
+          <span class="text-[11px] text-slate-400 font-medium hidden md:inline">Viewing as:</span>
+          <div id="currentUserAvatar" class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white user-pulse">
+            SC
+          </div>
+          <select id="userSelector" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer pr-1">
+            <option value="user_sarah" class="bg-slate-900 text-slate-200">Sarah Chen (Lead Architect)</option>
+            <option value="user_alex" class="bg-slate-900 text-slate-200">Alex Rivera (Frontend Dev)</option>
+            <option value="user_jordan" class="bg-slate-900 text-slate-200">Jordan Taylor (Product Manager)</option>
+            <option value="user_elena" class="bg-slate-900 text-slate-200">Elena Rostova (QA Engineer)</option>
+          </select>
+        </div>
+
+        <!-- Slide Deck Walkthrough Button -->
+        <button id="openDeckModalBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700 text-slate-200 flex items-center gap-1.5 transition-all shadow-sm group">
+          <i class="fa-solid fa-play text-indigo-400 group-hover:scale-110 transition-transform text-[11px]"></i>
+          <span>Feature Slides</span>
+        </button>
+
+        <!-- Model Inspector Button -->
+        <button id="openTsModalBtn" class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 flex items-center gap-1.5 transition-all shadow-sm">
+          <i class="fa-solid fa-code text-cyan-400 text-xs"></i>
+          <span class="hidden sm:inline">Model.ts</span>
+        </button>
+
+        <!-- Add Task Primary Button -->
+        <button id="openNewTaskBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 active:scale-95">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Add Task</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Live Collaboration Presence Bar -->
+  <div class="bg-indigo-950/20 border-b border-indigo-500/10 px-4 lg:px-8 py-2">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-400">
+      <div class="flex items-center gap-2">
+        <span class="text-slate-400 font-medium flex items-center gap-1.5">
+          <i class="fa-solid fa-users text-indigo-400 text-[11px]"></i> Active Collaborators on Board:
+        </span>
+        <div class="flex -space-x-1.5 overflow-hidden ml-1">
+          <span title="Sarah Chen (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-indigo-600 text-[9px] text-center font-bold text-white leading-5">SC</span>
+          <span title="Alex Rivera (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-sky-600 text-[9px] text-center font-bold text-white leading-5">AR</span>
+          <span title="Jordan Taylor (Idle)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-amber-600 text-[9px] text-center font-bold text-white leading-5">JT</span>
+          <span title="Elena Rostova (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-emerald-600 text-[9px] text-center font-bold text-white leading-5">ER</span>
+        </div>
+        <span id="collaboratorActivityText" class="text-[11px] text-indigo-300/80 italic ml-2 hidden sm:inline">Elena is inspecting Task #3...</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="quickSampleTaskBtn" class="text-indigo-400 hover:text-indigo-300 text-[11px] font-medium flex items-center gap-1 transition">
+          <i class="fa-solid fa-bolt text-[10px]"></i> Quick Seed Tasks
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto w-full px-4 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+    
+    <!-- Top Metrics Overview Strip -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4">
+      <div class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl flex items-center justify-between shadow-sm">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Tasks</span>
+          <p id="metricTotal" class="text-2xl font-bold font-mono text-white mt-0.5">0</p>
+        </div>
+        <div class="h-9 w-9 rounded-lg bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-400 font-mono text-xs font-semibold">
+          ALL
+        </div>
+      </div>
+      
+      <div class="bg-amber-950/20 border border-amber-800/30 p-4 rounded-xl flex items-center justify-between shadow-sm">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-amber-400 font-semibold">To Do</span>
+          <p id="metricTodo" class="text-2xl font-bold font-mono text-amber-200 mt-0.5">0</p>
+        </div>
+        <div class="h-3 w-3 rounded-full bg-amber-400 ring-4 ring-amber-400/20"></div>
+      </div>
+
+      <div class="bg-sky-950/20 border border-sky-800/30 p-4 rounded-xl flex items-center justify-between shadow-sm">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-sky-400 font-semibold">In Progress</span>
+          <p id="metricInProgress" class="text-2xl font-bold font-mono text-sky-200 mt-0.5">0</p>
+        </div>
+        <div class="h-3 w-3 rounded-full bg-sky-400 ring-4 ring-sky-400/20 animate-pulse"></div>
+      </div>
+
+      <div class="bg-emerald-950/20 border border-emerald-800/30 p-4 rounded-xl flex items-center justify-between shadow-sm">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-emerald-400 font-semibold">Done</span>
+          <p id="metricDone" class="text-2xl font-bold font-mono text-emerald-200 mt-0.5">0</p>
+        </div>
+        <div class="h-3 w-3 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20"></div>
+      </div>
+    </div>
+
+    <!-- Board Filter, Search & View Controls -->
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80">
+      
+      <!-- Primary View Mode Tabs -->
+      <div class="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-slate-800 w-fit">
+        <button id="viewBoardBtn" class="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white shadow transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-table-columns text-xs"></i>
+          <span>Task Board</span>
+        </button>
+        <button id="viewListBtn" class="px-3.5 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+          <i class="fa-solid fa-list-check text-xs"></i>
+          <span>List View</span>
+        </button>
+      </div>
+
+      <!-- Filters Toolbar -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        
+        <!-- Search Input -->
+        <div class="relative flex-1 sm:w-56">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+          <input type="text" id="searchInput" placeholder="Search tasks..." class="w-full bg-slate-950 border border-slate-800 text-xs rounded-lg pl-8 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+        </div>
+
+        <!-- Assignee Filter -->
+        <div class="flex items-center gap-1.5">
+          <label for="filterAssigneeSelect" class="text-xs text-slate-400 font-medium">Assignee:</label>
+          <select id="filterAssigneeSelect" class="bg-slate-950 border border-slate-700/80 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="all">Everyone</option>
+            <option value="me">Assigned to Me</option>
+            <option value="user_sarah">Sarah Chen</option>
+            <option value="user_alex">Alex Rivera</option>
+            <option value="user_jordan">Jordan Taylor</option>
+            <option value="user_elena">Elena Rostova</option>
+          </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="flex items-center gap-1.5">
+          <label for="filterStatusSelect" class="text-xs text-slate-400 font-medium">Status:</label>
+          <select id="filterStatusSelect" class="bg-slate-950 border border-slate-700/80 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 font-mono">
+            <option value="all">all (Task[])</option>
+            <option value="todo">"todo"</option>
+            <option value="in-progress">"in-progress"</option>
+            <option value="done">"done"</option>
+          </select>
+        </div>
+
+        <!-- Reset Button -->
+        <button id="resetDemoBtn" title="Reset sample tasks" class="p-2 rounded-lg border border-slate-700/80 bg-slate-800/40 text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i class="fa-solid fa-arrow-rotate-right text-xs"></i>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 1. Task Board (Kanban Columns) View -->
+    <div id="boardView" class="grid grid-cols-1 md:grid-cols-3 gap-5 flex-1 transition-opacity duration-300">
+      
+      <!-- Lane: Todo -->
+      <section class="flex flex-col bg-slate-900/30 rounded-2xl border border-slate-800/80 p-4">
+        <div class="flex items-center justify-between mb-3.5 pb-2.5 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <h2 class="font-semibold text-sm tracking-wide text-slate-200">Todo</h2>
+          </div>
+          <span id="badgeTodoCount" class="font-mono text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium">0</span>
+        </div>
+        <div id="todoLane" class="flex flex-col gap-3 flex-1 min-h-[160px]"></div>
+      </section>
+
+      <!-- Lane: In Progress -->
+      <section class="flex flex-col bg-slate-900/30 rounded-2xl border border-slate-800/80 p-4">
+        <div class="flex items-center justify-between mb-3.5 pb-2.5 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+            <h2 class="font-semibold text-sm tracking-wide text-slate-200">In Progress</h2>
+          </div>
+          <span id="badgeInProgressCount" class="font-mono text-xs px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 font-medium">0</span>
+        </div>
+        <div id="inProgressLane" class="flex flex-col gap-3 flex-1 min-h-[160px]"></div>
+      </section>
+
+      <!-- Lane: Done -->
+      <section class="flex flex-col bg-slate-900/30 rounded-2xl border border-slate-800/80 p-4">
+        <div class="flex items-center justify-between mb-3.5 pb-2.5 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <h2 class="font-semibold text-sm tracking-wide text-slate-200">Done</h2>
+          </div>
+          <span id="badgeDoneCount" class="font-mono text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">0</span>
+        </div>
+        <div id="doneLane" class="flex flex-col gap-3 flex-1 min-h-[160px]"></div>
+      </section>
+
+    </div>
+
+    <!-- 2. Filtered List View (Hidden by default) -->
+    <div id="listView" class="hidden flex-col gap-3 flex-1">
+      <div class="bg-slate-900/40 rounded-xl border border-slate-800 p-4 overflow-x-auto shadow-sm">
+        <table class="w-full text-left text-xs font-sans">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-mono uppercase text-[11px]">
+              <th class="py-2.5 px-3">ID</th>
+              <th class="py-2.5 px-3">Title & Details</th>
+              <th class="py-2.5 px-3">Assignee</th>
+              <th class="py-2.5 px-3">Priority</th>
+              <th class="py-2.5 px-3">Status (TaskStatus)</th>
+              <th class="py-2.5 px-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="listTableBody" class="divide-y divide-slate-800/60 font-sans"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Slide-Over Task Details Drawer (Side Sheet UX for other users) -->
+  <div id="drawerBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+  
+  <aside id="taskDetailDrawer" class="slide-panel slide-panel-closed fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-800 z-50 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
+    <div>
+      <!-- Drawer Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span id="drawerTaskIdBadge" class="text-xs font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">ID #1</span>
+          <span id="drawerStatusBadge" class="text-xs font-mono px-2 py-0.5 rounded-full border">todo</span>
+        </div>
+        <button id="closeDrawerBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Drawer Content -->
+      <div class="mt-5 space-y-5">
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">Task Title</label>
+          <h3 id="drawerTaskTitle" class="text-base font-bold text-white leading-snug">Task Name</h3>
+        </div>
+
+        <!-- Assignee & Collaborator Info -->
+        <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <span class="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Assignee</span>
+            <span id="drawerAssigneeName" class="text-xs font-medium text-slate-200 mt-0.5 block">Sarah Chen</span>
+            <span id="drawerAssigneeRole" class="text-[10px] text-slate-400">Lead Architect</span>
+          </div>
+          <div id="drawerAssigneeAvatar" class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white text-xs">
+            SC
+          </div>
+        </div>
+
+        <!-- Priority & Metadata -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-800/80">
+            <span class="text-[11px] text-slate-400 block font-semibold">Priority</span>
+            <span id="drawerPriorityBadge" class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 mt-1">
+              <i class="fa-solid fa-flag text-[10px]"></i> High
+            </span>
+          </div>
+          <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-800/80">
+            <span class="text-[11px] text-slate-400 block font-semibold">Type Validation</span>
+            <span class="text-xs font-mono text-emerald-400 mt-1 block">Valid Task</span>
+          </div>
+        </div>
+
+        <!-- Status Progress Rail -->
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Workflow Progression</label>
+          <div class="flex items-center justify-between gap-2 p-2.5 bg-slate-950/50 rounded-xl border border-slate-800 text-xs">
+            <div id="stepTodo" class="flex-1 text-center py-1.5 rounded-lg font-mono font-medium text-[11px]">Todo</div>
+            <i class="fa-solid fa-arrow-right text-[10px] text-slate-600"></i>
+            <div id="stepInProgress" class="flex-1 text-center py-1.5 rounded-lg font-mono font-medium text-[11px]">In-Progress</div>
+            <i class="fa-solid fa-arrow-right text-[10px] text-slate-600"></i>
+            <div id="stepDone" class="flex-1 text-center py-1.5 rounded-lg font-mono font-medium text-[11px]">Done</div>
+          </div>
+        </div>
+
+        <!-- Simulated Activity Log -->
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Audit & State Log</label>
+          <div class="space-y-2 text-xs font-mono text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <div class="flex items-center gap-2 text-slate-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>typeCheckedBy: tsc v5.4.0</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+              <span>immutableUpdate: Object.freeze()</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <span>assignedSync: WebSocket broadcasted</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawer Footer Actions -->
+    <div class="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+      <button id="drawerDeleteBtn" class="px-3.5 py-2 text-xs font-medium text-rose-400 hover:text-white hover:bg-rose-600/20 rounded-lg transition border border-rose-500/20">
+        <i class="fa-solid fa-trash mr-1.5"></i> Delete Task
+      </button>
+      <button id="drawerAdvanceBtn" class="flex-1 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30">
+        <span>Advance Status</span>
+        <i class="fa-solid fa-arrow-right text-[11px]"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Interactive Presentation Slides Modal (Sophisticated Feature Tour) -->
+  <div id="deckModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col min-h-[460px]">
+      
+      <!-- Deck Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <span class="px-2 py-0.5 text-[10px] font-mono bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">Interactive Deck</span>
+          <h3 class="text-sm font-bold text-white">TypeTasks Architecture & Multi-User Overview</h3>
+        </div>
+        <button id="closeDeckModalBtn" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Slide Deck Content Area -->
+      <div class="flex-1 py-6 flex flex-col justify-center">
+        
+        <!-- Slide 1: Strict Model Blueprint -->
+        <div id="slide1" class="deck-slide space-y-4">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono">
+            <span>Slide 1 / 4</span> &middot; <span>Data Architecture</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">The Type-Safe Foundation</h2>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            Pro builders don’t start with buttons and colors — they start with the strict data model. With <code class="text-indigo-400 font-mono">TaskStatus = 'todo' | 'in-progress' | 'done'</code>, invalid states can never exist at runtime.
+          </p>
+          <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-indigo-300 space-y-1">
+            <p><span class="text-amber-400">type</span> TaskStatus = <span class="text-emerald-400">"todo"</span> | <span class="text-emerald-400">"in-progress"</span> | <span class="text-emerald-400">"done"</span>;</p>
+            <p><span class="text-amber-400">interface</span> Task { id: number; title: string; status: TaskStatus; }</p>
+          </div>
+        </div>
+
+        <!-- Slide 2: Multi-User Collaboration UX -->
+        <div id="slide2" class="deck-slide hidden-slide space-y-4">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono">
+            <span>Slide 2 / 4</span> &middot; <span>Collaborative Workflows</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Sophisticated Multi-User UX</h2>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            Work as Sarah, Alex, Jordan, or Elena. Filter by <span class="text-indigo-400 font-semibold">"Assigned to Me"</span>, inspect live presence tags, and click any card to slide open deep contextual task inspection.
+          </p>
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300">
+              <strong class="text-white block mb-1">Slide-Over Side Sheet</strong>
+              Instant editing, status progression track, and audit log.
+            </div>
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300">
+              <strong class="text-white block mb-1">User Switcher</strong>
+              Test perspectives and user-specific permission views instantly.
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 3: Pure Immutability -->
+        <div id="slide3" class="deck-slide hidden-slide space-y-4">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+            <span>Slide 3 / 4</span> &middot; <span>Pure Functions</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Immutable Array Operations</h2>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            Every state mutation executes through pure functions returning new task arrays. Zero state leaks, full auditability, and instant UI re-renders with smooth slide transitions.
+          </p>
+          <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 space-y-1">
+            <p><span class="text-indigo-400">addTask</span>(tasks: Task[], title: string): Task[]</p>
+            <p><span class="text-indigo-400">completeTask</span>(tasks: Task[], id: number): Task[]</p>
+            <p><span class="text-indigo-400">filterByStatus</span>(tasks: Task[], status: TaskStatus): Task[]</p>
+          </div>
+        </div>
+
+        <!-- Slide 4: GitHub PR Ready -->
+        <div id="slide4" class="deck-slide hidden-slide space-y-4">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-mono">
+            <span>Slide 4 / 4</span> &middot; <span>Delivery & PR</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Zero Type Errors on tsc</h2>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            Strict compilation verified with custom extension operations: <code class="text-indigo-400 font-mono">advanceTask()</code>, <code class="text-indigo-400 font-mono">deleteTask()</code>, and <code class="text-indigo-400 font-mono">countByStatus()</code>.
+          </p>
+          <div class="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-emerald-400 text-xl"></i>
+            <span class="text-xs text-emerald-300">Ready to commit to branch <strong>part-1-model</strong> and open your GitHub Pull Request.</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Deck Footer Controls -->
+      <div class="pt-4 border-t border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-1.5" id="slideDots">
+          <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 transition-all"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="prevSlideBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+            <i class="fa-solid fa-chevron-left mr-1"></i> Prev
+          </button>
+          <button id="nextSlideBtn" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+            Next <i class="fa-solid fa-chevron-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- New Task Modal Dialog -->
+  <div id="newTaskModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+      <h3 class="text-base font-bold text-white mb-1">Create Task on Board</h3>
+      <p class="text-xs text-slate-400 mb-4 font-mono">addTask(tasks: Task[], title: string, assignee): Task[]</p>
+      
+      <form id="newTaskForm" class="space-y-4">
+        <div>
+          <label for="taskTitleInput" class="block text-xs font-medium text-slate-300 mb-1">Task Title <span class="text-rose-400">*</span></label>
+          <input type="text" id="taskTitleInput" placeholder="e.g., Define TaskStatus literal union" required class="w-full px-3.5 py-2 text-sm bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-indigo-500 transition">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="taskAssigneeSelect" class="block text-xs font-medium text-slate-300 mb-1">Assignee</label>
+            <select id="taskAssigneeSelect" class="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+              <option value="user_sarah">Sarah Chen</option>
+              <option value="user_alex">Alex Rivera</option>
+              <option value="user_jordan">Jordan Taylor</option>
+              <option value="user_elena">Elena Rostova</option>
+            </select>
+          </div>
+          <div>
+            <label for="taskPrioritySelect" class="block text-xs font-medium text-slate-300 mb-1">Priority</label>
+            <select id="taskPrioritySelect" class="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono text-slate-400">
+          Default State: <span class="text-amber-400 font-semibold">status: "todo"</span>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancelModalBtn" class="px-4 py-2 text-xs font-medium rounded-lg text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-md shadow-indigo-600/30">Append Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TypeScript Inspector Modal -->
+  <div id="tsInspectorModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span>TypeScript Model Inspector</span>
+            <span class="px-2 py-0.5 text-[10px] font-mono bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">model.ts</span>
+          </h3>
+          <p class="text-xs text-slate-400">Task[] serialized in memory with pure immutable actions</p>
+        </div>
+        <button id="closeTsModalBtn" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="mt-4 flex-1 overflow-auto bg-slate-950 p-4 rounded-xl border border-slate-800/80 font-mono text-xs text-slate-300 space-y-3">
+        <p class="text-slate-500">// Read-only state snapshot:</p>
+        <pre id="jsonPreview" class="text-indigo-300 leading-relaxed overflow-x-auto"></pre>
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button id="closeTsModalBtn2" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Typed User Directory
+     */
+    const USERS = {
+      user_sarah: { id: "user_sarah", name: "Sarah Chen", role: "Lead Architect", initials: "SC", color: "bg-indigo-600" },
+      user_alex: { id: "user_alex", name: "Alex Rivera", role: "Frontend Dev", initials: "AR", color: "bg-sky-600" },
+      user_jordan: { id: "user_jordan", name: "Jordan Taylor", role: "Product Manager", initials: "JT", color: "bg-amber-600" },
+      user_elena: { id: "user_elena", name: "Elena Rostova", role: "QA Engineer", initials: "ER", color: "bg-emerald-600" }
+    };
+
+    let activeUserKey = "user_sarah";
+
+    /**
+     * Model runtime implementation (model.ts equivalent)
+     */
+    function addTask(tasks, title, assigneeId = "user_sarah", priority = "medium") {
+      const trimmed = title.trim();
+      if (!trimmed) return tasks;
+      const nextId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
+      const newTask = {
+        id: nextId,
+        title: trimmed,
+        status: "todo",
+        assigneeId: assigneeId,
+        priority: priority
+      };
+      return [...tasks, newTask];
+    }
+
+    function completeTask(tasks, id) {
+      return tasks.map(task => task.id === id ? { ...task, status: "done" } : task);
+    }
+
+    function advanceTask(tasks, id) {
+      return tasks.map(task => {
+        if (task.id !== id) return task;
+        let nextStatus = task.status;
+        if (task.status === "todo") {
+          nextStatus = "in-progress";
+        } else if (task.status === "in-progress") {
+          nextStatus = "done";
+        }
+        return { ...task, status: nextStatus };
+      });
+    }
+
+    function deleteTask(tasks, id) {
+      return tasks.filter(task => task.id !== id);
+    }
+
+    function filterByStatus(tasks, status) {
+      if (status === "all") return tasks;
+      return tasks.filter(task => task.status === status);
+    }
+
+    const initialTasks = [
+      { id: 1, title: "Define Task interface & TaskStatus union", status: "done", assigneeId: "user_sarah", priority: "high" },
+      { id: 2, title: "Implement addTask, completeTask & filterByStatus", status: "done", assigneeId: "user_alex", priority: "high" },
+      { id: 3, title: "Ensure tsc reports 0 type errors on strict mode", status: "in-progress", assigneeId: "user_elena", priority: "high" },
+      { id: 4, title: "Commit model.ts to part-1-model and open GitHub PR", status: "todo", assigneeId: "user_sarah", priority: "medium" },
+      { id: 5, title: "Configure multi-user collaborative presence handlers", status: "in-progress", assigneeId: "user_jordan", priority: "medium" },
+      { id: 6, title: "Write custom advanceTask() helper with union narrowing", status: "todo", assigneeId: "user_alex", priority: "low" }
+    ];
+
+    let currentTasks = [...initialTasks];
+    let activeFilter = "all";
+    let activeAssigneeFilter = "all";
+    let searchQuery = "";
+    let activeView = "board"; // 'board' | 'list'
+    let selectedTaskIdForDrawer = null;
+
+    // DOM References
+    const todoLane = document.getElementById("todoLane");
+    const inProgressLane = document.getElementById("inProgressLane");
+    const doneLane = document.getElementById("doneLane");
+    const listTableBody = document.getElementById("listTableBody");
+
+    const metricTotal = document.getElementById("metricTotal");
+    const metricTodo = document.getElementById("metricTodo");
+    const metricInProgress = document.getElementById("metricInProgress");
+    const metricDone = document.getElementById("metricDone");
+
+    const badgeTodoCount = document.getElementById("badgeTodoCount");
+    const badgeInProgressCount = document.getElementById("badgeInProgressCount");
+    const badgeDoneCount = document.getElementById("badgeDoneCount");
+
+    const boardView = document.getElementById("boardView");
+    const listView = document.getElementById("listView");
+    const viewBoardBtn = document.getElementById("viewBoardBtn");
+    const viewListBtn = document.getElementById("viewListBtn");
+
+    const filterStatusSelect = document.getElementById("filterStatusSelect");
+    const filterAssigneeSelect = document.getElementById("filterAssigneeSelect");
+    const searchInput = document.getElementById("searchInput");
+    const userSelector = document.getElementById("userSelector");
+    const currentUserAvatar = document.getElementById("currentUserAvatar");
+
+    // Drawer references
+    const taskDetailDrawer = document.getElementById("taskDetailDrawer");
+    const drawerBackdrop = document.getElementById("drawerBackdrop");
+    const closeDrawerBtn = document.getElementById("closeDrawerBtn");
+    const drawerTaskIdBadge = document.getElementById("drawerTaskIdBadge");
+    const drawerStatusBadge = document.getElementById("drawerStatusBadge");
+    const drawerTaskTitle = document.getElementById("drawerTaskTitle");
+    const drawerAssigneeName = document.getElementById("drawerAssigneeName");
+    const drawerAssigneeRole = document.getElementById("drawerAssigneeRole");
+    const drawerAssigneeAvatar = document.getElementById("drawerAssigneeAvatar");
+    const drawerPriorityBadge = document.getElementById("drawerPriorityBadge");
+    const drawerAdvanceBtn = document.getElementById("drawerAdvanceBtn");
+    const drawerDeleteBtn = document.getElementById("drawerDeleteBtn");
+    const stepTodo = document.getElementById("stepTodo");
+    const stepInProgress = document.getElementById("stepInProgress");
+    const stepDone = document.getElementById("stepDone");
+
+    // Modals references
+    const newTaskModal = document.getElementById("newTaskModal");
+    const openNewTaskBtn = document.getElementById("openNewTaskBtn");
+    const cancelModalBtn = document.getElementById("cancelModalBtn");
+    const newTaskForm = document.getElementById("newTaskForm");
+    const taskTitleInput = document.getElementById("taskTitleInput");
+    const taskAssigneeSelect = document.getElementById("taskAssigneeSelect");
+    const taskPrioritySelect = document.getElementById("taskPrioritySelect");
+
+    const tsInspectorModal = document.getElementById("tsInspectorModal");
+    const openTsModalBtn = document.getElementById("openTsModalBtn");
+    const closeTsModalBtn = document.getElementById("closeTsModalBtn");
+    const closeTsModalBtn2 = document.getElementById("closeTsModalBtn2");
+    const jsonPreview = document.getElementById("jsonPreview");
+    const resetDemoBtn = document.getElementById("resetDemoBtn");
+    const quickSampleTaskBtn = document.getElementById("quickSampleTaskBtn");
+
+    // Presentation deck controls
+    const deckModal = document.getElementById("deckModal");
+    const openDeckModalBtn = document.getElementById("openDeckModalBtn");
+    const closeDeckModalBtn = document.getElementById("closeDeckModalBtn");
+    const prevSlideBtn = document.getElementById("prevSlideBtn");
+    const nextSlideBtn = document.getElementById("nextSlideBtn");
+    const slideDots = document.getElementById("slideDots").children;
+    let currentSlideIndex = 0;
+    const slides = [
+      document.getElementById("slide1"),
+      document.getElementById("slide2"),
+      document.getElementById("slide3"),
+      document.getElementById("slide4")
+    ];
+
+    function updateMetrics() {
+      metricTotal.textContent = currentTasks.length;
+      metricTodo.textContent = currentTasks.filter(t => t.status === "todo").length;
+      metricInProgress.textContent = currentTasks.filter(t => t.status === "in-progress").length;
+      metricDone.textContent = currentTasks.filter(t => t.status === "done").length;
+
+      badgeTodoCount.textContent = currentTasks.filter(t => t.status === "todo").length;
+      badgeInProgressCount.textContent = currentTasks.filter(t => t.status === "in-progress").length;
+      badgeDoneCount.textContent = currentTasks.filter(t => t.status === "done").length;
+
+      jsonPreview.textContent = JSON.stringify(currentTasks, null, 2);
+    }
+
+    function getFilteredTasks() {
+      return currentTasks.filter(task => {
+        // Status filter
+        if (activeFilter !== "all" && task.status !== activeFilter) return false;
+
+        // Assignee filter
+        if (activeAssigneeFilter === "me") {
+          if (task.assigneeId !== activeUserKey) return false;
+        } else if (activeAssigneeFilter !== "all") {
+          if (task.assigneeId !== activeAssigneeFilter) return false;
+        }
+
+        // Search text
+        if (searchQuery) {
+          const matchTitle = task.title.toLowerCase().includes(searchQuery);
+          const user = USERS[task.assigneeId];
+          const matchUser = user && user.name.toLowerCase().includes(searchQuery);
+          if (!matchTitle && !matchUser) return false;
+        }
+
+        return true;
+      });
+    }
+
+    function renderTaskCard(task) {
+      const user = USERS[task.assigneeId] || USERS.user_sarah;
+      const card = document.createElement("div");
+      card.id = `task-card-${task.id}`;
+      card.className = "task-card-enter bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700/80 p-3.5 rounded-xl shadow-sm transition-all duration-200 group flex flex-col justify-between gap-3 cursor-pointer";
+
+      // On card click -> open side slide-over drawer
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return; // ignore if button clicked
+        openTaskDrawer(task.id);
+      });
+
+      const statusBadgeStyles = {
+        "todo": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        "in-progress": "bg-sky-500/10 text-sky-400 border-sky-500/20",
+        "done": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+      };
+
+      const priorityBadge = {
+        "high": '<span class="text-rose-400 text-[10px] font-medium flex items-center gap-1"><i class="fa-solid fa-angles-up text-[9px]"></i> High</span>',
+        "medium": '<span class="text-amber-400 text-[10px] font-medium flex items-center gap-1"><i class="fa-solid fa-angle-up text-[9px]"></i> Med</span>',
+        "low": '<span class="text-slate-400 text-[10px] font-medium flex items-center gap-1"><i class="fa-solid fa-minus text-[9px]"></i> Low</span>'
+      }[task.priority || "medium"];
+
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-mono text-slate-500">#${task.id}</span>
+              ${priorityBadge}
+            </div>
+            <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full border ${statusBadgeStyles[task.status]}">${task.status}</span>
+          </div>
+          <p class="text-xs sm:text-sm font-medium text-slate-200 leading-snug group-hover:text-white transition-colors">${task.title}</p>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-800/60">
+          <div class="flex items-center gap-1.5" title="Assigned to ${user.name}">
+            <div class="w-5 h-5 rounded-full ${user.color} flex items-center justify-center text-[9px] font-bold text-white">
+              ${user.initials}
+            </div>
+            <span class="text-[11px] text-slate-400 truncate max-w-[90px]">${user.name.split(' ')[0]}</span>
+          </div>
+
+          <div class="flex items-center gap-1">
+            ${task.status !== 'done' ? `
+              <button onclick="handleAdvanceTask(${task.id})" class="px-2 py-1 text-[11px] font-semibold rounded bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white transition-colors flex items-center gap-1" title="Advance status">
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                <span>${task.status === 'todo' ? 'Start' : 'Finish'}</span>
+              </button>
+            ` : ''}
+            <button onclick="handleDeleteTask(${task.id})" class="p-1.5 text-[11px] rounded bg-slate-800/60 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors" title="Delete Task">
+              <i class="fa-solid fa-trash-can text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `;
+
+      return card;
+    }
+
+    function renderBoard() {
+      todoLane.innerHTML = '';
+      inProgressLane.innerHTML = '';
+      doneLane.innerHTML = '';
+
+      const tasksToDisplay = getFilteredTasks();
+      const todos = tasksToDisplay.filter(t => t.status === "todo");
+      const inProgress = tasksToDisplay.filter(t => t.status === "in-progress");
+      const done = tasksToDisplay.filter(t => t.status === "done");
+
+      if (todos.length === 0) {
+        todoLane.innerHTML = `<div class="h-28 flex flex-col items-center justify-center text-xs text-slate-600 border border-dashed border-slate-800/80 rounded-xl gap-1"><i class="fa-regular fa-clipboard text-slate-700 text-base"></i><span>No tasks in Todo</span></div>`;
+      } else {
+        todos.forEach(t => todoLane.appendChild(renderTaskCard(t)));
+      }
+
+      if (inProgress.length === 0) {
+        inProgressLane.innerHTML = `<div class="h-28 flex flex-col items-center justify-center text-xs text-slate-600 border border-dashed border-slate-800/80 rounded-xl gap-1"><i class="fa-solid fa-spinner text-slate-700 text-base"></i><span>No active tasks</span></div>`;
+      } else {
+        inProgress.forEach(t => inProgressLane.appendChild(renderTaskCard(t)));
+      }
+
+      if (done.length === 0) {
+        doneLane.innerHTML = `<div class="h-28 flex flex-col items-center justify-center text-xs text-slate-600 border border-dashed border-slate-800/80 rounded-xl gap-1"><i class="fa-regular fa-circle-check text-slate-700 text-base"></i><span>No completed tasks</span></div>`;
+      } else {
+        done.forEach(t => doneLane.appendChild(renderTaskCard(t)));
+      }
+    }
+
+    function renderList() {
+      listTableBody.innerHTML = '';
+      const tasksToDisplay = getFilteredTasks();
+
+      if (tasksToDisplay.length === 0) {
+        listTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500 font-mono text-xs">No matching tasks found</td></tr>`;
+        return;
+      }
+
+      tasksToDisplay.forEach(task => {
+        const user = USERS[task.assigneeId] || USERS.user_sarah;
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/30 transition-colors cursor-pointer";
+        tr.onclick = (e) => {
+          if (e.target.closest("button")) return;
+          openTaskDrawer(task.id);
+        };
+
+        tr.innerHTML = `
+          <td class="py-3 px-3 font-mono text-indigo-400 font-medium">#${task.id}</td>
+          <td class="py-3 px-3 text-slate-200 font-medium">
+            <span class="hover:text-indigo-400 transition">${task.title}</span>
+          </td>
+          <td class="py-3 px-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-5 h-5 rounded-full ${user.color} text-[9px] flex items-center justify-center font-bold text-white">${user.initials}</span>
+              <span class="text-slate-300 text-xs">${user.name}</span>
+            </div>
+          </td>
+          <td class="py-3 px-3 font-mono text-xs uppercase text-slate-400">${task.priority || 'medium'}</td>
+          <td class="py-3 px-3">
+            <span class="inline-flex px-2 py-0.5 text-[10px] font-mono rounded-full uppercase border ${
+              task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+              task.status === 'in-progress' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+              'bg-amber-500/10 text-amber-400 border-amber-500/20'
+            }">${task.status}</span>
+          </td>
+          <td class="py-3 px-3 text-right space-x-1.5">
+            ${task.status !== 'done' ? `<button onclick="handleAdvanceTask(${task.id})" class="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition">Advance</button>` : ''}
+            <button onclick="handleDeleteTask(${task.id})" class="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-rose-600 text-slate-200 hover:text-white transition">Delete</button>
+          </td>
+        `;
+        listTableBody.appendChild(tr);
+      });
+    }
+
+    function renderAll() {
+      updateMetrics();
+      if (activeView === "board") {
+        renderBoard();
+      } else {
+        renderList();
+      }
+    }
+
+    // Slide-Over Drawer Controls
+    function openTaskDrawer(id) {
+      const task = currentTasks.find(t => t.id === id);
+      if (!task) return;
+      selectedTaskIdForDrawer = id;
+
+      const user = USERS[task.assigneeId] || USERS.user_sarah;
+      drawerTaskIdBadge.textContent = `ID #${task.id}`;
+      drawerTaskTitle.textContent = task.title;
+      drawerAssigneeName.textContent = user.name;
+      drawerAssigneeRole.textContent = user.role;
+      drawerAssigneeAvatar.textContent = user.initials;
+      drawerAssigneeAvatar.className = `w-9 h-9 rounded-full ${user.color} flex items-center justify-center font-bold text-white text-xs`;
+
+      drawerStatusBadge.textContent = task.status;
+      drawerStatusBadge.className = `text-xs font-mono px-2 py-0.5 rounded-full border ${
+        task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+        task.status === 'in-progress' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+        'bg-amber-500/10 text-amber-400 border-amber-500/20'
+      }`;
+
+      drawerPriorityBadge.innerHTML = `<i class="fa-solid fa-flag text-[10px]"></i> ${task.priority ? task.priority.toUpperCase() : 'MEDIUM'}`;
+
+      // Update progress step rail
+      stepTodo.className = task.status === 'todo' ? 'flex-1 text-center py-1.5 rounded-lg font-mono font-bold text-[11px] bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'flex-1 text-center py-1.5 rounded-lg font-mono text-[11px] text-slate-500';
+      stepInProgress.className = task.status === 'in-progress' ? 'flex-1 text-center py-1.5 rounded-lg font-mono font-bold text-[11px] bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'flex-1 text-center py-1.5 rounded-lg font-mono text-[11px] text-slate-500';
+      stepDone.className = task.status === 'done' ? 'flex-1 text-center py-1.5 rounded-lg font-mono font-bold text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'flex-1 text-center py-1.5 rounded-lg font-mono text-[11px] text-slate-500';
+
+      drawerAdvanceBtn.style.display = task.status === 'done' ? 'none' : 'flex';
+      drawerAdvanceBtn.innerHTML = `<span>Advance to ${task.status === 'todo' ? 'In-Progress' : 'Done'}</span> <i class="fa-solid fa-arrow-right text-[11px]"></i>`;
+
+      drawerBackdrop.classList.remove("hidden");
+      taskDetailDrawer.classList.remove("slide-panel-closed");
+      taskDetailDrawer.classList.add("slide-panel-open");
+    }
+
+    function closeTaskDrawer() {
+      taskDetailDrawer.classList.remove("slide-panel-open");
+      taskDetailDrawer.classList.add("slide-panel-closed");
+      drawerBackdrop.classList.add("hidden");
+      selectedTaskIdForDrawer = null;
+    }
+
+    closeDrawerBtn.addEventListener("click", closeTaskDrawer);
+    drawerBackdrop.addEventListener("click", closeTaskDrawer);
+
+    drawerAdvanceBtn.addEventListener("click", () => {
+      if (selectedTaskIdForDrawer !== null) {
+        handleAdvanceTask(selectedTaskIdForDrawer);
+        openTaskDrawer(selectedTaskIdForDrawer);
+      }
+    });
+
+    drawerDeleteBtn.addEventListener("click", () => {
+      if (selectedTaskIdForDrawer !== null) {
+        handleDeleteTask(selectedTaskIdForDrawer);
+        closeTaskDrawer();
+      }
+    });
+
+    // Global Task Action Handlers
+    window.handleAdvanceTask = function(id) {
+      const card = document.getElementById(`task-card-${id}`);
+      if (card) card.classList.add("slide-exit");
+      setTimeout(() => {
+        currentTasks = advanceTask(currentTasks, id);
+        renderAll();
+      }, 140);
+    };
+
+    window.handleCompleteTask = function(id) {
+      const card = document.getElementById(`task-card-${id}`);
+      if (card) card.classList.add("slide-exit");
+      setTimeout(() => {
+        currentTasks = completeTask(currentTasks, id);
+        renderAll();
+      }, 140);
+    };
+
+    window.handleDeleteTask = function(id) {
+      const card = document.getElementById(`task-card-${id}`);
+      if (card) card.classList.add("slide-exit");
+      setTimeout(() => {
+        currentTasks = deleteTask(currentTasks, id);
+        renderAll();
+      }, 140);
+    };
+
+    // User Persona Selector
+    userSelector.addEventListener("change", (e) => {
+      activeUserKey = e.target.value;
+      const user = USERS[activeUserKey];
+      currentUserAvatar.textContent = user.initials;
+      currentUserAvatar.className = `w-6 h-6 rounded-full ${user.color} flex items-center justify-center text-[10px] font-bold text-white user-pulse`;
+      
+      const collabText = document.getElementById("collaboratorActivityText");
+      collabText.textContent = `${user.name} is now navigating the Task Board...`;
+      renderAll();
+    });
+
+    // Filtering & Searching listeners
+    filterStatusSelect.addEventListener("change", (e) => {
+      activeFilter = e.target.value;
+      renderAll();
+    });
+
+    filterAssigneeSelect.addEventListener("change", (e) => {
+      activeAssigneeFilter = e.target.value;
+      renderAll();
+    });
+
+    searchInput.addEventListener("input", (e) => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      renderAll();
+    });
+
+    // Switch between Task Board & List View
+    viewBoardBtn.addEventListener("click", () => {
+      activeView = "board";
+      viewBoardBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white shadow transition-all flex items-center gap-1.5";
+      viewListBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all flex items-center gap-1.5";
+      boardView.classList.remove("hidden");
+      listView.classList.add("hidden");
+      renderAll();
+    });
+
+    viewListBtn.addEventListener("click", () => {
+      activeView = "list";
+      viewListBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white shadow transition-all flex items-center gap-1.5";
+      viewBoardBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all flex items-center gap-1.5";
+      listView.classList.remove("hidden");
+      boardView.classList.add("hidden");
+      renderAll();
+    });
+
+    // Add Task Modal Controls
+    openNewTaskBtn.addEventListener("click", () => {
+      taskTitleInput.value = "";
+      taskAssigneeSelect.value = activeUserKey;
+      newTaskModal.classList.remove("hidden");
+      taskTitleInput.focus();
+    });
+
+    cancelModalBtn.addEventListener("click", () => {
+      newTaskModal.classList.add("hidden");
+    });
+
+    newTaskForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const title = taskTitleInput.value.trim();
+      if (!title) return;
+      const assignee = taskAssigneeSelect.value;
+      const priority = taskPrioritySelect.value;
+      currentTasks = addTask(currentTasks, title, assignee, priority);
+      newTaskModal.classList.add("hidden");
+      renderAll();
+    });
+
+    // Model Inspector Controls
+    openTsModalBtn.addEventListener("click", () => {
+      tsInspectorModal.classList.remove("hidden");
+    });
+    closeTsModalBtn.addEventListener("click", () => {
+      tsInspectorModal.classList.add("hidden");
+    });
+    closeTsModalBtn2.addEventListener("click", () => {
+      tsInspectorModal.classList.add("hidden");
+    });
+
+    // Feature Slides Deck Controls
+    function showSlide(index) {
+      slides.forEach((s, idx) => {
+        if (idx === index) {
+          s.classList.remove("hidden-slide");
+        } else {
+          s.classList.add("hidden-slide");
+        }
+      });
+      Array.from(slideDots).forEach((dot, idx) => {
+        dot.className = idx === index ? "w-2.5 h-2.5 rounded-full bg-indigo-500 transition-all" : "w-2.5 h-2.5 rounded-full bg-slate-700 transition-all";
+      });
+    }
+
+    openDeckModalBtn.addEventListener("click", () => {
+      currentSlideIndex = 0;
+      showSlide(currentSlideIndex);
+      deckModal.classList.remove("hidden");
+    });
+
+    closeDeckModalBtn.addEventListener("click", () => {
+      deckModal.classList.add("hidden");
+    });
+
+    nextSlideBtn.addEventListener("click", () => {
+      currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+      showSlide(currentSlideIndex);
+    });
+
+    prevSlideBtn.addEventListener("click", () => {
+      currentSlideIndex = (currentSlideIndex - 1 + slides.length) % slides.length;
+      showSlide(currentSlideIndex);
+    });
+
+    // Quick demo actions
+    resetDemoBtn.addEventListener("click", () => {
+      currentTasks = [...initialTasks];
+      filterStatusSelect.value = "all";
+      filterAssigneeSelect.value = "all";
+      searchInput.value = "";
+      activeFilter = "all";
+      activeAssigneeFilter = "all";
+      searchQuery = "";
+      renderAll();
+    });
+
+    quickSampleTaskBtn.addEventListener("click", () => {
+      const titles = [
+        "Write unit tests for advanceTask() edge case",
+        "Benchmark immutability on 10,000 tasks",
+        "Prepare documentation walkthrough deck",
+        "Conduct peer code review for PR approval"
+      ];
+      const randomTitle = titles[Math.floor(Math.random() * titles.length)];
+      const usersList = Object.keys(USERS);
+      const randomUser = usersList[Math.floor(Math.random() * usersList.length)];
+      currentTasks = addTask(currentTasks, randomTitle, randomUser, "high");
+      renderAll();
+    });
+
+    // Initial render
+    renderAll();
+  </script>
+</body>
+</html>
