@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Task Board — Type-Safe Collaborative Tracker</title>
-  <script type="module" src="./model.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -140,13 +139,13 @@
         <div class="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-inner">
           <span class="text-[11px] text-slate-400 font-medium hidden md:inline">Viewing as:</span>
           <div id="currentUserAvatar" class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white user-pulse">
-            SC
+            HA
           </div>
           <select id="userSelector" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer pr-1">
-            <option value="user_sarah" class="bg-slate-900 text-slate-200">Sarah Chen (Lead Architect)</option>
-            <option value="user_alex" class="bg-slate-900 text-slate-200">Alex Rivera (Frontend Dev)</option>
-            <option value="user_jordan" class="bg-slate-900 text-slate-200">Jordan Taylor (Product Manager)</option>
-            <option value="user_elena" class="bg-slate-900 text-slate-200">Elena Rostova (QA Engineer)</option>
+            <option value="user_Harshit" class="bg-slate-900 text-slate-200">Harshit (Lead Architect)</option>
+            <option value="user_Prajjwal" class="bg-slate-900 text-slate-200">Prajjwal (Frontend Dev)</option>
+            <option value="user_Niyam" class="bg-slate-900 text-slate-200">Niyam (Product Manager)</option>
+            <option value="user_Chaitanya" class="bg-slate-900 text-slate-200">Chaitanya (QA Engineer)</option>
           </select>
         </div>
 
@@ -180,12 +179,12 @@
           <i class="fa-solid fa-users text-indigo-400 text-[11px]"></i> Active Collaborators on Board:
         </span>
         <div class="flex -space-x-1.5 overflow-hidden ml-1">
-          <span title="Sarah Chen (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-indigo-600 text-[9px] text-center font-bold text-white leading-5">SC</span>
-          <span title="Alex Rivera (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-sky-600 text-[9px] text-center font-bold text-white leading-5">AR</span>
-          <span title="Jordan Taylor (Idle)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-amber-600 text-[9px] text-center font-bold text-white leading-5">JT</span>
-          <span title="Elena Rostova (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-emerald-600 text-[9px] text-center font-bold text-white leading-5">ER</span>
+          <span title="Harshit (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-indigo-600 text-[9px] text-center font-bold text-white leading-5">HA</span>
+          <span title="Prajjwal (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-sky-600 text-[9px] text-center font-bold text-white leading-5">PR</span>
+          <span title="Niyam (Idle)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-amber-600 text-[9px] text-center font-bold text-white leading-5">NY</span>
+          <span title="Chaitanya (Active)" class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-900 bg-emerald-600 text-[9px] text-center font-bold text-white leading-5">CH</span>
         </div>
-        <span id="collaboratorActivityText" class="text-[11px] text-indigo-300/80 italic ml-2 hidden sm:inline">Elena is inspecting Task #3...</span>
+        <span id="collaboratorActivityText" class="text-[11px] text-indigo-300/80 italic ml-2 hidden sm:inline">Chaitanya is inspecting Task #3...</span>
       </div>
       <div class="flex items-center gap-3">
         <button id="quickSampleTaskBtn" class="text-indigo-400 hover:text-indigo-300 text-[11px] font-medium flex items-center gap-1 transition">
@@ -264,10 +263,10 @@
           <select id="filterAssigneeSelect" class="bg-slate-950 border border-slate-700/80 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500">
             <option value="all">Everyone</option>
             <option value="me">Assigned to Me</option>
-            <option value="user_sarah">Sarah Chen</option>
-            <option value="user_alex">Alex Rivera</option>
-            <option value="user_jordan">Jordan Taylor</option>
-            <option value="user_elena">Elena Rostova</option>
+            <option value="user_Harshit">Harshit</option>
+            <option value="user_Prajjwal">Prajjwal</option>
+            <option value="user_Niyam">Niyam</option>
+            <option value="user_Chaitanya">Chaitanya</option>
           </select>
         </div>
 
@@ -352,7 +351,7 @@
 
   </main>
 
-  <!-- Slide-Over Task Details Drawer (Side Sheet UX for other users) -->
+  <!-- Slide-Over Task Details Drawer -->
   <div id="drawerBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 hidden transition-opacity"></div>
   
   <aside id="taskDetailDrawer" class="slide-panel slide-panel-closed fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-slate-800 z-50 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
@@ -379,11 +378,11 @@
         <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between">
           <div>
             <span class="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">Assignee</span>
-            <span id="drawerAssigneeName" class="text-xs font-medium text-slate-200 mt-0.5 block">Sarah Chen</span>
+            <span id="drawerAssigneeName" class="text-xs font-medium text-slate-200 mt-0.5 block">Harshit</span>
             <span id="drawerAssigneeRole" class="text-[10px] text-slate-400">Lead Architect</span>
           </div>
           <div id="drawerAssigneeAvatar" class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white text-xs">
-            SC
+            HA
           </div>
         </div>
 
@@ -413,7 +412,7 @@
           </div>
         </div>
 
-        <!-- Simulated Activity Log -->
+        <!-- Audit & State Log -->
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Audit & State Log</label>
           <div class="space-y-2 text-xs font-mono text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
@@ -446,7 +445,7 @@
     </div>
   </aside>
 
-  <!-- Interactive Presentation Slides Modal (Sophisticated Feature Tour) -->
+  <!-- Interactive Presentation Slides Modal -->
   <div id="deckModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col min-h-[460px]">
       
@@ -464,7 +463,7 @@
       <!-- Slide Deck Content Area -->
       <div class="flex-1 py-6 flex flex-col justify-center">
         
-        <!-- Slide 1: Strict Model Blueprint -->
+        <!-- Slide 1 -->
         <div id="slide1" class="deck-slide space-y-4">
           <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono">
             <span>Slide 1 / 4</span> &middot; <span>Data Architecture</span>
@@ -479,14 +478,14 @@
           </div>
         </div>
 
-        <!-- Slide 2: Multi-User Collaboration UX -->
+        <!-- Slide 2 -->
         <div id="slide2" class="deck-slide hidden-slide space-y-4">
           <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono">
             <span>Slide 2 / 4</span> &middot; <span>Collaborative Workflows</span>
           </div>
           <h2 class="text-2xl font-extrabold text-white">Sophisticated Multi-User UX</h2>
           <p class="text-sm text-slate-300 leading-relaxed">
-            Work as Sarah, Alex, Jordan, or Elena. Filter by <span class="text-indigo-400 font-semibold">"Assigned to Me"</span>, inspect live presence tags, and click any card to slide open deep contextual task inspection.
+            Work as Harshit, Prajjwal, Niyam, or Chaitanya. Filter by <span class="text-indigo-400 font-semibold">"Assigned to Me"</span>, inspect live presence tags, and click any card to slide open deep contextual task inspection.
           </p>
           <div class="grid grid-cols-2 gap-3 pt-1">
             <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300">
@@ -500,7 +499,7 @@
           </div>
         </div>
 
-        <!-- Slide 3: Pure Immutability -->
+        <!-- Slide 3 -->
         <div id="slide3" class="deck-slide hidden-slide space-y-4">
           <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
             <span>Slide 3 / 4</span> &middot; <span>Pure Functions</span>
@@ -516,7 +515,7 @@
           </div>
         </div>
 
-        <!-- Slide 4: GitHub PR Ready -->
+        <!-- Slide 4 -->
         <div id="slide4" class="deck-slide hidden-slide space-y-4">
           <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-mono">
             <span>Slide 4 / 4</span> &middot; <span>Delivery & PR</span>
@@ -570,10 +569,10 @@
           <div>
             <label for="taskAssigneeSelect" class="block text-xs font-medium text-slate-300 mb-1">Assignee</label>
             <select id="taskAssigneeSelect" class="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-indigo-500">
-              <option value="user_sarah">Sarah Chen</option>
-              <option value="user_alex">Alex Rivera</option>
-              <option value="user_jordan">Jordan Taylor</option>
-              <option value="user_elena">Elena Rostova</option>
+              <option value="user_Harshit">Harshit</option>
+              <option value="user_Prajjwal">Prajjwal</option>
+              <option value="user_Niyam">Niyam</option>
+              <option value="user_Chaitanya">Chaitanya</option>
             </select>
           </div>
           <div>
@@ -626,21 +625,21 @@
 
   <script>
     /**
-     * Typed User Directory
+     * Typed User Directory with accurate initials
      */
     const USERS = {
-      user_sarah: { id: "user_sarah", name: "Sarah Chen", role: "Lead Architect", initials: "SC", color: "bg-indigo-600" },
-      user_alex: { id: "user_alex", name: "Alex Rivera", role: "Frontend Dev", initials: "AR", color: "bg-sky-600" },
-      user_jordan: { id: "user_jordan", name: "Jordan Taylor", role: "Product Manager", initials: "JT", color: "bg-amber-600" },
-      user_elena: { id: "user_elena", name: "Elena Rostova", role: "QA Engineer", initials: "ER", color: "bg-emerald-600" }
+      user_Harshit: { id: "user_Harshit", name: "Harshit", role: "Lead Architect", initials: "HA", color: "bg-indigo-600" },
+      user_Prajjwal: { id: "user_Prajjwal", name: "Prajjwal", role: "Frontend Dev", initials: "PR", color: "bg-sky-600" },
+      user_Niyam: { id: "user_Niyam", name: "Niyam", role: "Product Manager", initials: "NY", color: "bg-amber-600" },
+      user_Chaitanya: { id: "user_Chaitanya", name: "Chaitanya", role: "QA Engineer", initials: "CH", color: "bg-emerald-600" }
     };
 
-    let activeUserKey = "user_sarah";
+    let activeUserKey = "user_Harshit";
 
     /**
      * Model runtime implementation (model.ts equivalent)
      */
-    function addTask(tasks, title, assigneeId = "user_sarah", priority = "medium") {
+    function addTask(tasks, title, assigneeId = "user_Harshit", priority = "medium") {
       const trimmed = title.trim();
       if (!trimmed) return tasks;
       const nextId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
@@ -681,12 +680,12 @@
     }
 
     const initialTasks = [
-      { id: 1, title: "Define Task interface & TaskStatus union", status: "done", assigneeId: "user_sarah", priority: "high" },
-      { id: 2, title: "Implement addTask, completeTask & filterByStatus", status: "done", assigneeId: "user_alex", priority: "high" },
-      { id: 3, title: "Ensure tsc reports 0 type errors on strict mode", status: "in-progress", assigneeId: "user_elena", priority: "high" },
-      { id: 4, title: "Commit model.ts to part-1-model and open GitHub PR", status: "todo", assigneeId: "user_sarah", priority: "medium" },
-      { id: 5, title: "Configure multi-user collaborative presence handlers", status: "in-progress", assigneeId: "user_jordan", priority: "medium" },
-      { id: 6, title: "Write custom advanceTask() helper with union narrowing", status: "todo", assigneeId: "user_alex", priority: "low" }
+      { id: 1, title: "Define Task interface & TaskStatus union", status: "done", assigneeId: "user_Harshit", priority: "high" },
+      { id: 2, title: "Implement addTask, completeTask & filterByStatus", status: "done", assigneeId: "user_Prajjwal", priority: "high" },
+      { id: 3, title: "Ensure tsc reports 0 type errors on strict mode", status: "in-progress", assigneeId: "user_Niyam", priority: "high" },
+      { id: 4, title: "Commit model.ts to part-1-model and open GitHub PR", status: "todo", assigneeId: "user_Harshit", priority: "medium" },
+      { id: 5, title: "Configure multi-user collaborative presence handlers", status: "in-progress", assigneeId: "user_Niyam", priority: "medium" },
+      { id: 6, title: "Write custom advanceTask() helper with union narrowing", status: "todo", assigneeId: "user_Prajjwal", priority: "low" }
     ];
 
     let currentTasks = [...initialTasks];
@@ -809,14 +808,14 @@
     }
 
     function renderTaskCard(task) {
-      const user = USERS[task.assigneeId] || USERS.user_sarah;
+      const user = USERS[task.assigneeId] || USERS.user_Harshit;
       const card = document.createElement("div");
       card.id = `task-card-${task.id}`;
       card.className = "task-card-enter bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700/80 p-3.5 rounded-xl shadow-sm transition-all duration-200 group flex flex-col justify-between gap-3 cursor-pointer";
 
       // On card click -> open side slide-over drawer
       card.addEventListener("click", (e) => {
-        if (e.target.closest("button")) return; // ignore if button clicked
+        if (e.target.closest("button")) return;
         openTaskDrawer(task.id);
       });
 
@@ -849,7 +848,7 @@
             <div class="w-5 h-5 rounded-full ${user.color} flex items-center justify-center text-[9px] font-bold text-white">
               ${user.initials}
             </div>
-            <span class="text-[11px] text-slate-400 truncate max-w-[90px]">${user.name.split(' ')[0]}</span>
+            <span class="text-[11px] text-slate-400 truncate max-w-[90px]">${user.name}</span>
           </div>
 
           <div class="flex items-center gap-1">
@@ -908,7 +907,7 @@
       }
 
       tasksToDisplay.forEach(task => {
-        const user = USERS[task.assigneeId] || USERS.user_sarah;
+        const user = USERS[task.assigneeId] || USERS.user_Harshit;
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-800/30 transition-colors cursor-pointer";
         tr.onclick = (e) => {
@@ -959,7 +958,7 @@
       if (!task) return;
       selectedTaskIdForDrawer = id;
 
-      const user = USERS[task.assigneeId] || USERS.user_sarah;
+      const user = USERS[task.assigneeId] || USERS.user_Harshit;
       drawerTaskIdBadge.textContent = `ID #${task.id}`;
       drawerTaskTitle.textContent = task.title;
       drawerAssigneeName.textContent = user.name;
